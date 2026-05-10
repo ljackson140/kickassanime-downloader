@@ -51,7 +51,7 @@ except FileNotFoundError:
 
 class CONFIGS(enum.Enum):
     config = 1
-    to_update = 2
+    download_config = 2
     watch_config = 3
 
 def update_config(case: CONFIGS, config: dict):
@@ -604,22 +604,34 @@ class player:
         api_url = (DOMAIN_REGEX.sub(WEBSITE_DOMAIN,
                    "https://www2.kickassanime.rs/api/anime_search"))
         data = {"keyword": query}
-        async with session.post(api_url, data=data) as resp:
-            # print(await resp.text())
-            resp_data = await resp.json(content_type=None)
-        if flag:
-            await session.close()  # for one time use
-        if len(resp_data) != 0:
-            if option is not None:
-                return resp_data[option]
-            else:
-                for j, i in enumerate(resp_data):
-                    print(COLOUR.blue(f"{j} {i['name']}"))
-                option = int(input("Enter anime number: "))
-                return resp_data[option]
-        else:
-            print(COLOUR.error(f"No anime avaiable for {query}"))
+
+        try:
+            async with session.post(api_url, data=data) as resp:
+                if resp.status != 200:
+                    print(COLOUR.error(
+                        f"Search service unavailable ({resp.status})."))
+                    return None
+                # print(await resp.text())
+                resp_data = await resp.json(content_type=None)
+        except Exception:
+            print(COLOUR.error(
+                "Search service unavailable. Please try again later."))
             return None
+        finally:
+            if flag:
+                await session.close()  # for one time use
+
+        if not isinstance(resp_data, list) or len(resp_data) == 0:
+            print(COLOUR.error(f"No anime available for {query}."))
+            return None
+
+        if option is not None:
+            return resp_data[option]
+        else:
+            for j, i in enumerate(resp_data):
+                print(COLOUR.blue(f"{j} {i['name']}"))
+            option = int(input("Enter anime number: "))
+            return resp_data[option]
 
     @staticmethod
     async def fetch_latest(session: Union[ClientSession, None] = None) -> None:
